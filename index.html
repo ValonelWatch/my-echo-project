@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>WatchChain — Test Echo</title>
-  <!-- Правильный скрипт TonConnect UI -->
+  <!-- TonConnect UI (UMD-бандл для браузера) -->
   <script src="https://unpkg.com/@tonconnect/ui/dist/tonconnect-ui.browser.js"></script>
   <style>
     body { background:#111; color:#eee; font-family:Arial,sans-serif; text-align:center; padding:40px; }
@@ -17,8 +17,10 @@
 <body>
 
   <h1>WatchChain — Test Echo</h1>
+  <!-- Тут автоматически появится кнопка Connect Wallet -->
   <div id="ton-connect-button"></div>
 
+  <!-- Основной UI -->
   <div id="app">
     <textarea id="incidentText" placeholder="Введите любой текст…"></textarea><br>
     <button id="sendBtn">Отправить 0.001 TON</button>
@@ -26,54 +28,58 @@
   </div>
 
   <script>
+    // Адрес твоего EchoContract в testnet
     const CONTRACT_ADDRESS = 'EQBvL1b1vvi-yXP_leOiX3tsOBawWItXOf9FmB0xCl6chsx5';
 
-    // Инициализируем TonConnect UI без лишних опций network
-    const tonConnectUI = new TonConnectUI({
+    // Инициализируем TonConnect UI
+    const ui = new TonConnectUI({
       manifestUrl: 'https://mvpp.netlify.app/tonconnect-manifest.json',
       buttonRootId: 'ton-connect-button',
       openBridgeAsPopup: true,
       openMethod: 'bridge'
     });
 
-    // Показываем форму только когда кошелёк подключён
-    tonConnectUI.onStatusChange(wallet => {
+    // Показываем форму, когда кошелёк подключён
+    ui.onStatusChange(wallet => {
       document.getElementById('app').style.display = wallet ? 'block' : 'none';
     });
 
     document.getElementById('sendBtn').onclick = async () => {
       const status = document.getElementById('status');
       status.textContent = '';
+
       try {
         // Если ещё не подключены — открываем bridge
-        if (!tonConnectUI.wallet) {
-          await tonConnectUI.connect();
+        if (!ui.wallet) {
+          await ui.connect();
         }
-        const wallet = tonConnectUI.wallet;
-        if (!wallet) throw new Error('Кошелёк не подключён');
+        const wallet = ui.wallet;
+        if (!wallet) throw new Error('Не удалось подключить кошелёк');
 
-        const text = document.getElementById('incidentText').value.trim();
-        if (!text) { alert('Введите текст!'); return; }
+        // Берём текст
+        const txt = document.getElementById('incidentText').value.trim();
+        if (!txt) { alert('Введите текст!'); return; }
 
-        // Кодируем текст напрямую в base64
-        const payload = btoa(unescape(encodeURIComponent(text)));
+        // Кодируем в base64 (без потери UTF-8)
+        const payload = btoa(unescape(encodeURIComponent(txt)));
 
-        // Формируем транзакцию
+        // Собираем транзакцию
         const tx = {
-          validUntil: Math.floor(Date.now()/1000) + 600,
+          validUntil: Math.floor(Date.now() / 1000) + 600,
           messages: [{
             address: CONTRACT_ADDRESS,
-            amount: '1000000',    // 0.001 TON
-            payload              // <-- вот здесь payload, не payloadBase64
+            amount: '1000000',  // 0.001 TON
+            payload            // <-- вот он, base64-пейлоад
           }]
         };
 
-        console.log('Отправляем транзакцию:', tx);
-        await tonConnectUI.sendTransaction(tx);
-        status.textContent = '✅ Запрос отправлен! Подтвердите в кошельке.';
+        console.log('TX to send:', tx);
+        await ui.sendTransaction(tx);
+
+        status.textContent = '✅ Транзакция отправлена! Подтвердите в кошельке.';
       } catch (e) {
         console.error(e);
-        status.textContent = '❌ Ошибка: ' + (e.code||e.message||e);
+        status.textContent = '❌ Ошибка: ' + (e.code || e.message || e);
       }
     };
   </script>
