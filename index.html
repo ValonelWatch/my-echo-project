@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>WatchChain — Test Echo</title>
-  <!-- Убираем все несуществующие скрипты (index.browser.js и т.п.) -->
   <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui/dist/tonconnect-ui.min.js"></script>
   <style>
     body { background:#111; color:#eee; font-family:Arial,sans-serif; text-align:center; padding:40px; }
@@ -30,13 +29,13 @@
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: 'https://mvpp.netlify.app/tonconnect-manifest.json',
       buttonRootId: 'ton-connect-button',
-      network: 'testnet',
+      network: 'testnet',            // для кнопки просто отображаем testnet
       openBridgeAsPopup: true,
       openMethod: 'bridge'
     });
 
+    // Показываем форму только после подключения
     tonConnectUI.onStatusChange(wallet => {
-      console.log('onStatusChange:', wallet);
       document.getElementById('app').style.display = wallet ? 'block' : 'none';
     });
 
@@ -46,35 +45,34 @@
       console.log('Button clicked');
 
       try {
+        // Ждём, пока юзер подключит кошелёк
         let wallet = await tonConnectUI.wallet;
         if (!wallet) {
-          console.log('No wallet, opening bridge…');
-          await tonConnectUI.connect();       // QR-модалка
+          await tonConnectUI.connect();
           wallet = await tonConnectUI.wallet;
-          console.log('Connected:', wallet);
         }
 
         const text = document.getElementById('incidentText').value.trim();
-        if (!text) { alert('Введите текст!'); return; }
+        if (!text) {
+          alert('Введите текст!');
+          return;
+        }
 
-        // Кодируем сообщение в Base64
-        const bytes = new TextEncoder().encode(text);
-        const payload = btoa(String.fromCharCode(...bytes));
-
-        // Собираем и отправляем транзакцию
+        // Собираем транзакцию по новому Zod-схеме TonConnectUI v2
         const tx = {
-          network: 'testnet',
+          network: -239,                          // числовой ID тестнета
           validUntil: Math.floor(Date.now()/1000) + 600,
           messages: [
             {
               address: CONTRACT_ADDRESS,
-              amount: '1000000',
-              payload   // <- именно так TonConnectUI ждёт данные
+              amount: '1000000',                 // 0.001 TON
+              type: 'text',                      // обязательно
+              text                               // текст сообщения
             }
           ]
         };
-        console.log('TX:', tx);
 
+        console.log('TX:', tx);
         await tonConnectUI.sendTransaction(tx);
         console.log('sendTransaction done');
         status.textContent = '✅ Запрос отправлен! Подтвердите в кошельке.';
