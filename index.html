@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>WatchChain — Test Echo</title>
   <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui/dist/tonconnect-ui.min.js"></script>
   <style>
@@ -26,15 +27,16 @@
 
   <script>
     const CONTRACT_ADDRESS = 'EQBvL1b1vvi-yXP_leOiX3tsOBawWItXOf9FmB0xCl6chsx5';
+
+    // Инициализируем TonConnect UI
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: 'https://mvpp.netlify.app/tonconnect-manifest.json',
       buttonRootId: 'ton-connect-button',
-      network: 'testnet',            // для кнопки просто отображаем testnet
       openBridgeAsPopup: true,
       openMethod: 'bridge'
     });
 
-    // Показываем форму только после подключения
+    // Показываем форму только когда кошелёк привязан
     tonConnectUI.onStatusChange(wallet => {
       document.getElementById('app').style.display = wallet ? 'block' : 'none';
     });
@@ -42,12 +44,11 @@
     document.getElementById('sendBtn').onclick = async () => {
       const status = document.getElementById('status');
       status.textContent = '';
-      console.log('Button clicked');
 
       try {
-        // Ждём, пока юзер подключит кошелёк
         let wallet = await tonConnectUI.wallet;
         if (!wallet) {
+          // Открываем QR/мост, если ещё не подключено
           await tonConnectUI.connect();
           wallet = await tonConnectUI.wallet;
         }
@@ -58,26 +59,23 @@
           return;
         }
 
-        // Собираем транзакцию по новому Zod-схеме TonConnectUI v2
+        // Формируем транзакцию: в payload кладём просто строку и указываем payloadType='text'
         const tx = {
-          network: -239,                          // числовой ID тестнета
-          validUntil: Math.floor(Date.now()/1000) + 600,
-          messages: [
-            {
-              address: CONTRACT_ADDRESS,
-              amount: '1000000',                 // 0.001 TON
-              type: 'text',                      // обязательно
-              text                               // текст сообщения
-            }
-          ]
+          validUntil: Math.floor(Date.now() / 1000) + 600,  // час жизни запроса
+          network: -239,                                     // тестнет
+          messages: [{
+            address: CONTRACT_ADDRESS,
+            amount: '1000000',       // 0.001 TON
+            payload: text,
+            payloadType: 'text'
+          }]
         };
 
-        console.log('TX:', tx);
+        console.log('TX ready:', tx);
         await tonConnectUI.sendTransaction(tx);
-        console.log('sendTransaction done');
         status.textContent = '✅ Запрос отправлен! Подтвердите в кошельке.';
       } catch (e) {
-        console.error('Error:', e);
+        console.error(e);
         status.textContent = '❌ ' + (e.message || e);
       }
     };
@@ -85,3 +83,4 @@
 
 </body>
 </html>
+
