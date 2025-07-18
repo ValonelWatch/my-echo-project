@@ -2,48 +2,17 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>WatchChain — Echo</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui/dist/tonconnect-ui.min.js"></script>
+  <!-- TON Connect UI -->
+  <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #eee;
-      text-align: center;
-      padding: 40px;
-    }
-    #ton-connect-button {
-      margin: 20px auto;
-    }
-    #app {
-      display: none;
-      margin-top: 20px;
-    }
-    textarea {
-      width: 90%;
-      max-width: 600px;
-      height: 100px;
-      padding: 10px;
-      background: #222;
-      color: #eee;
-      border: none;
-      border-radius: 5px;
-    }
-    button {
-      padding: 10px 20px;
-      margin-top: 10px;
-      background: #00ffc8;
-      color: #000;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    #status {
-      margin-top: 15px;
-      min-height: 18px;
-      color: #0f0;
-    }
+    body { background: #111; color: #eee; font-family: Arial, sans-serif; text-align: center; padding: 40px }
+    #ton-connect-button { margin: 20px auto; }
+    #app { display: none; margin-top: 20px }
+    textarea { width: 90%; max-width: 600px; height: 100px; padding: 10px; background: #222; color: #eee; border: none; border-radius: 5px }
+    button { padding: 10px 20px; margin-top: 10px; background: #00ffc8; color: #000; border: none; border-radius: 5px; cursor: pointer }
+    #status { margin-top: 15px; min-height: 18px; color: #0f0 }
   </style>
 </head>
 <body>
@@ -52,24 +21,25 @@
   <div id="ton-connect-button"></div>
 
   <div id="app">
-    <textarea id="incidentText" placeholder="Введите любой текст…"></textarea><br>
+    <textarea id="incidentText" placeholder="Введите любой текст…"></textarea><br/>
     <button id="sendBtn">Отправить 0.001 TON</button>
     <div id="status"></div>
   </div>
 
   <script>
-    // Адрес вашего уже задеплоенного EchoContract в тестнете
+    // ваш EchoContract, задеплоенный в testnet
     const CONTRACT_ADDRESS = 'EQBvL1b1vvi-yXP_leOiX3tsOBawWItXOf9FmB0xCl6chsx5';
 
-    // Инициализируем TonConnect UI
+    // инициализируем TonConnect UI
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: `${location.origin}/tonconnect-manifest.json`,
       buttonRootId: 'ton-connect-button',
-      network: 'testnet'
+      network: 'testnet',
+      openBridgeAsPopup: true
     });
 
-    // Показываем форму только когда кошель подключён
     tonConnectUI.onStatusChange(wallet => {
+      // показываем форму только когда кошелек уже подключен
       document.getElementById('app').style.display = wallet ? 'block' : 'none';
     });
 
@@ -78,39 +48,57 @@
       status.textContent = '';
 
       try {
-        // Если не подключены — показываем QR/модалку
         let wallet = await tonConnectUI.wallet;
         if (!wallet) {
+          // если еще не подключился — открываем QR/модалку
           await tonConnectUI.connect();
           wallet = await tonConnectUI.wallet;
         }
 
+        // читаем и валидируем текст
         const text = document.getElementById('incidentText').value.trim();
         if (!text) {
-          status.textContent = 'Введите текст!';
+          status.textContent = '⚠️ Введите текст!';
           return;
         }
 
-        // Кодируем текст в base64
-        const payloadBase64 = btoa(text);
+        // кодируем в Uint8Array
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(text);
 
-        // Формируем и отправляем транзакцию
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
+        // в Base64 (на всякий случай)
+        const payloadBase64 = btoa(String.fromCharCode(...bytes));
+
+        // и в HEX (чтобы кошелек точно принял payload)
+        const payloadHex = Array.from(bytes)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+
+        // формируем транзакцию
+        const tx = {
+          validUntil: Math.floor(Date.now() / 1000) + 600,  // +10 минут
           messages: [{
             address: CONTRACT_ADDRESS,
-            amount: '1000000',      // 0.001 TON
+            amount: '1000000',       // 0.001 TON
+            // Отправляем оба формата — кошелек выберет первый поддерживаемый:
+            payload: payloadHex,
             payloadBase64
           }]
-        });
+        };
 
-        status.textContent = '✅ Запрос отправлен! Подтвердите в кошельке.';
+        console.log('TX →', tx);
+        await tonConnectUI.sendTransaction(tx);
+
+        status.textContent = '✅ Запрос отправлен! Пожалуйста, подтвердите в кошельке.';
       } catch (e) {
         console.error(e);
         status.textContent = '❌ ' + (e.message || e);
       }
     };
   </script>
+
+</body>
+</html>
 
 </body>
 </html>
