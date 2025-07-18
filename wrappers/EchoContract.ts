@@ -1,18 +1,49 @@
-import { Address, beginCell, Cell, Contract, ContractProvider, Sender, SendMode } from '@ton/core';
+// wrappers/EchoContract.ts
+import {
+  Address,
+  Cell,
+  beginCell,
+  Contract,
+  ContractProvider,
+  Sender,
+  SendMode
+} from '@ton/core';
 
 export class EchoContract implements Contract {
-    constructor(readonly address: Address) {}
+  readonly address: Address;
 
-    async sendDeploy(provider: ContractProvider, via: Sender, value: bigint) {
-        const body = beginCell()
-            .storeUint(0, 32)
-            .storeStringTail("echo")
-            .endCell();
+  constructor(address: Address) {
+    this.address = address;
+  }
 
-        await provider.internal(via, {
-            value,
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body
-        });
-    }
+  static createFromAddress(address: Address) {
+    return new EchoContract(address);
+  }
+
+  /** Привязка провайдера вызывается автоматически blueprint’ом */
+  __setProvider(provider: ContractProvider) {
+    this.provider = provider;
+  }
+  private provider!: ContractProvider;
+
+  /** Отправляем сообщение без тела (деплой) */
+  async sendDeploy(via: Sender, value: bigint) {
+    await this.provider.external(via, {
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell().endCell(),
+      value
+    });
+  }
+
+  /** Отправляем текстовое сообщение контракту */
+  async sendMessage(via: Sender, text: string) {
+    const body = beginCell()
+      .storeBuffer(new TextEncoder().encode(text))
+      .endCell();
+    await this.provider.external(via, {
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body,
+      value: BigInt(1_000_000) // 0.001 TON
+    });
+  }
 }
