@@ -1,23 +1,5 @@
 node_modules
-temp
-build
 dist
-.DS_Store
-package.ts
-
-# VS Code
-.vscode/*
-.history/
-*.vsix
-
-# IDEA files
+*.log
 .idea
-
-# VIM
-Session.vim
-.vim/
-
-# Other private editor folders
-.nvim/
-.emacs/
-.helix/
+.vscode
