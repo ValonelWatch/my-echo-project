@@ -1,5 +1,11 @@
-#include "imports/stdlib.fc";
+;; EchoContract.contract.fc
+#include "stdlib.fc"
 
-() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
-
+global _on_external() impure {
+    ;; Если есть тело сообщения — возвращаем его отправителю
+    if (msg_body_ref.bits > 0) {
+        var reply_body = slice_to_cell(msg_body_ref);
+        ;; отсылаем обратно на адрес msg_info.src
+        send_rawmsg(msg_info.src, reply_body, {value: msg_info.value, bounce: false});
+    }
 }
