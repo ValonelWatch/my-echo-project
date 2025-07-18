@@ -3,31 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <title>WatchChain — Test Echo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <!-- TONConnect UI CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <style>
-    /* ... твои стили ... */
+    body { background:#111; color:#eee; font-family:Arial,sans-serif; text-align:center; padding:40px; }
+    #ton-connect-button { margin:20px auto; display:inline-block; }
+    #app { display:none; margin-top:20px; }
+    textarea { width:90%; height:100px; padding:10px; background:#222; color:#eee; border:none; border-radius:5px; }
+    button { padding:10px 20px; margin-top:10px; background:#00ffc8; color:#000; border:none; border-radius:5px; cursor:pointer; }
+    #status { margin-top:15px; min-height:18px; color:#0f0; }
   </style>
 </head>
 <body>
+
   <h1>WatchChain — Test Echo</h1>
   <div id="ton-connect-button"></div>
-  <div id="app" style="display:none">
-    <textarea id="incidentText"></textarea><br>
-    <button id="sendBtn">Отправить</button>
+
+  <div id="app">
+    <textarea id="incidentText" placeholder="Введите любой текст…"></textarea><br>
+    <button id="sendBtn">Отправить 0.001 TON</button>
     <div id="status"></div>
   </div>
 
   <script>
-    // отладочная печать
-    console.log("TonConnectUI glob1:", window.TonConnectUI);
-    console.log("TonConnectUI glob2:", window.TON_CONNECT_UI?.TonConnectUI);
+    // 1) Адрес контракта
+    const CONTRACT_ADDRESS = 'EQBvL1b1vvi-yXP_leOiX3tsOBawWItXOf9FmB0xCl6chsx5';
 
-    // выбираем правильный конструктор
-    const UIClass = window.TonConnectUI || window.TON_CONNECT_UI?.TonConnectUI;
+    // 2) Выбираем правильный глобал
+    const UIClass = window.TON_CONNECT_UI?.TonConnectUI;
     if (!UIClass) {
-      throw new Error("TonConnectUI не найден в глобальных переменных");
+      console.error('TonConnectUI не найден в window.TON_CONNECT_UI.TonConnectUI');
+      throw new Error('TonConnectUI missing');
     }
 
+    // 3) Инициализируем UI
     const tonConnectUI = new UIClass({
       manifestUrl: 'https://mvpp.netlify.app/tonconnect-manifest.json',
       buttonRootId: 'ton-connect-button',
@@ -36,32 +46,62 @@
       openMethod: 'bridge'
     });
 
+    // 4) Подписываемся на статус кошелька
     tonConnectUI.onStatusChange(wallet => {
+      console.log('🌀 onStatusChange:', wallet);
       document.getElementById('app').style.display = wallet ? 'block' : 'none';
     });
 
+    // 5) Нажатие «Отправить»
     document.getElementById('sendBtn').onclick = async () => {
       const status = document.getElementById('status');
       status.textContent = '';
+      console.log('▶️ Клик по Send');
+
       try {
+        // 5.1) Убедиться, что wallet подключён
         let wallet = await tonConnectUI.wallet;
         if (!wallet) {
+          console.log('🛠 Открываем мост для подключения…');
           await tonConnectUI.connect();
           wallet = await tonConnectUI.wallet;
+          console.log('✅ Wallet подключился:', wallet);
         }
+
+        // 5.2) Собираем текст и кодируем
         const text = document.getElementById('incidentText').value.trim();
-        if (!text) { alert('Введите текст'); return; }
+        if (!text) {
+          alert('Введите текст!');
+          return;
+        }
         const bytes = new TextEncoder().encode(text);
-        const payload = btoa(String.fromCharCode(...bytes));
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now()/1000)+600,
-          messages: [{ address: CONTRACT_ADDRESS, amount: '1000000', payloadBase64: payload }]
-        });
-        status.textContent = '✅ Подтвердите в кошельке';
+        const payloadBase64 = btoa(String.fromCharCode(...bytes));
+
+        // 5.3) Формируем транзакцию
+        const tx = {
+          validUntil: Math.floor(Date.now()/1000) + 600,
+          messages: [
+            {
+              address: CONTRACT_ADDRESS,
+              amount: '1000000',          // 0.001 TON
+              payloadBase64              // обязательно именно payloadBase64
+            }
+          ]
+        };
+        console.log('⚙️ TX payload:', tx);
+
+        // 5.4) Отправляем
+        console.log('⏳ Отправка транзакции…');
+        await tonConnectUI.sendTransaction(tx);
+        console.log('✅ sendTransaction returned');
+        status.textContent = '✅ Запрос отправлен! Подтвердите в кошельке.';
+
       } catch (e) {
-        status.textContent = '❌ ' + (e.message||e);
+        console.error('❌ Ошибка отправки:', e);
+        status.textContent = '❌ ' + (e.message || e);
       }
     };
   </script>
+
 </body>
 </html>
