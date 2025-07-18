@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>WatchChain — Test Echo</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui/dist/tonconnect-ui.min.js"></script>
+  <style>
+    body { background:#111; color:#eee; font-family:Arial,sans-serif; text-align:center; padding:40px; }
+    #ton-connect-button { margin:20px auto; }
+    #app { display:none; margin-top:20px; }
+    textarea { width:90%; height:100px; padding:10px; background:#222; color:#eee; border:none; border-radius:5px; }
+    button { padding:10px 20px; margin-top:10px; background:#00ffc8; color:#000; border:none; border-radius:5px; cursor:pointer; }
+    #status { margin-top:15px; min-height:18px; color:#0f0; }
+  </style>
+</head>
+<body>
+
+  <h1>WatchChain — Test Echo</h1>
+  <div id="ton-connect-button"></div>
+
+  <div id="app">
+    <textarea id="incidentText" placeholder="Введите любой текст…"></textarea><br>
+    <button id="sendBtn">Отправить 0.001 TON</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const CONTRACT_ADDRESS = 'EQBvL1b1vvi-yXP_leOiX3tsOBawWItXOf9FmB0xCl6chsx5';
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: 'https://mvpp.netlify.app/tonconnect-manifest.json',
+      buttonRootId: 'ton-connect-button',
+      network: 'testnet',
+      openBridgeAsPopup: true,
+      openMethod: 'bridge'
+    });
+
+    tonConnectUI.onStatusChange(wallet => {
+      console.log('onStatusChange:', wallet);
+      document.getElementById('app').style.display = wallet ? 'block' : 'none';
+    });
+
+    document.getElementById('sendBtn').onclick = async () => {
+      const status = document.getElementById('status');
+      status.textContent = '';
+      console.log('Button clicked');
+
+      try {
+        let wallet = await tonConnectUI.wallet;
+        if (!wallet) {
+          console.log('No wallet, opening bridge…');
+          await tonConnectUI.connect();       // QR‑модалка
+          wallet = await tonConnectUI.wallet;
+          console.log('Connected:', wallet);
+        }
+
+        const text = document.getElementById('incidentText').value.trim();
+        if (!text) { alert('Введите текст!'); return; }
+
+        const bytes = new TextEncoder().encode(text);
+        const payloadBase64 = btoa(String.fromCharCode(...bytes));
+        const tx = {
+          validUntil: Math.floor(Date.now()/1000) + 600,
+          messages: [{ address: CONTRACT_ADDRESS, amount: '1000000', payloadBase64 }]
+        };
+        console.log('TX:', tx);
+
+        await tonConnectUI.sendTransaction(tx);
+        console.log('sendTransaction done');
+        status.textContent = '✅ Запрос отправлен! Подтвердите в кошельке.';
+      } catch (e) {
+        console.error('Error:', e);
+        status.textContent = '❌ ' + (e.message||e);
+      }
+    };
+  </script>
+
+</body>
+</html>
