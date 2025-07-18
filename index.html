@@ -2,9 +2,9 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>WatchChain — Test Echo</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui/dist/tonconnect-ui.min.js"></script>
+  <!-- Правильный скрипт TonConnect UI -->
+  <script src="https://unpkg.com/@tonconnect/ui/dist/tonconnect-ui.browser.js"></script>
   <style>
     body { background:#111; color:#eee; font-family:Arial,sans-serif; text-align:center; padding:40px; }
     #ton-connect-button { margin:20px auto; }
@@ -28,15 +28,15 @@
   <script>
     const CONTRACT_ADDRESS = 'EQBvL1b1vvi-yXP_leOiX3tsOBawWItXOf9FmB0xCl6chsx5';
 
-    // Инициализируем TonConnect UI
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+    // Инициализируем TonConnect UI без лишних опций network
+    const tonConnectUI = new TonConnectUI({
       manifestUrl: 'https://mvpp.netlify.app/tonconnect-manifest.json',
       buttonRootId: 'ton-connect-button',
       openBridgeAsPopup: true,
       openMethod: 'bridge'
     });
 
-    // Показываем форму только когда кошелёк привязан
+    // Показываем форму только когда кошелёк подключён
     tonConnectUI.onStatusChange(wallet => {
       document.getElementById('app').style.display = wallet ? 'block' : 'none';
     });
@@ -44,43 +44,39 @@
     document.getElementById('sendBtn').onclick = async () => {
       const status = document.getElementById('status');
       status.textContent = '';
-
       try {
-        let wallet = await tonConnectUI.wallet;
-        if (!wallet) {
-          // Открываем QR/мост, если ещё не подключено
+        // Если ещё не подключены — открываем bridge
+        if (!tonConnectUI.wallet) {
           await tonConnectUI.connect();
-          wallet = await tonConnectUI.wallet;
         }
+        const wallet = tonConnectUI.wallet;
+        if (!wallet) throw new Error('Кошелёк не подключён');
 
         const text = document.getElementById('incidentText').value.trim();
-        if (!text) {
-          alert('Введите текст!');
-          return;
-        }
+        if (!text) { alert('Введите текст!'); return; }
 
-        // Формируем транзакцию: в payload кладём просто строку и указываем payloadType='text'
+        // Кодируем текст напрямую в base64
+        const payload = btoa(unescape(encodeURIComponent(text)));
+
+        // Формируем транзакцию
         const tx = {
-          validUntil: Math.floor(Date.now() / 1000) + 600,  // час жизни запроса
-          network: -239,                                     // тестнет
+          validUntil: Math.floor(Date.now()/1000) + 600,
           messages: [{
             address: CONTRACT_ADDRESS,
-            amount: '1000000',       // 0.001 TON
-            payload: text,
-            payloadType: 'text'
+            amount: '1000000',    // 0.001 TON
+            payload              // <-- вот здесь payload, не payloadBase64
           }]
         };
 
-        console.log('TX ready:', tx);
+        console.log('Отправляем транзакцию:', tx);
         await tonConnectUI.sendTransaction(tx);
         status.textContent = '✅ Запрос отправлен! Подтвердите в кошельке.';
       } catch (e) {
         console.error(e);
-        status.textContent = '❌ ' + (e.message || e);
+        status.textContent = '❌ Ошибка: ' + (e.code||e.message||e);
       }
     };
   </script>
 
 </body>
 </html>
-
