@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@ton/core": "^0.62.0",
-    "@ton/blueprint": "^0.39.0"
+    "@ton/blueprint": "^0.38.0"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
