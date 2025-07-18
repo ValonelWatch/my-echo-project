@@ -1,36 +1,21 @@
-import { toNano, contractAddress, beginCell, Cell } from '@ton/core';
-import { NetworkProvider } from '@ton/blueprint';
-import { EchoContract } from '../wrappers/EchoContract';
+// scripts/deployEchoContract.ts
 import { compile } from '@ton/blueprint';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { beginCell, contractAddress, toNano } from '@ton/core';
+import type { NetworkProvider } from '@ton/blueprint';
+import { EchoContract } from '../wrappers/EchoContract';
 
 export async function run(provider: NetworkProvider) {
-    console.log('--- 🚀 DEPLOY START ---');
+  // 1) Компилируем
+  const { code, data: _ } = await compile('EchoContract');
+  const data = beginCell().endCell();
 
-    const sender = provider.sender();
-    const senderAddr = sender.address?.toString();
-    if (!senderAddr) {
-        console.error('❌ Sender address is undefined');
-        return;
-    }
-    console.log('👤 Sender address:', senderAddr);
+  // 2) Вычисляем адрес
+  const address = contractAddress(0, { code, data });
+  console.log('➡️  Деплой контракта по адресу', address.toString());
 
-    const compiledPath = resolve(__dirname, '../build/EchoContract.compiled.json');
-    const compiled = JSON.parse(readFileSync(compiledPath, 'utf8'));
-
-    const codeCell = Cell.fromBoc(Buffer.from(compiled.hex, 'hex'))[0];
-    const dataCell = new Cell(); // Если без инициализации
-
-    const address = contractAddress(0, { code: codeCell, data: dataCell });
-    console.log('📬 Future contract address:', address.toString());
-
-    const contract = provider.open(
-        new EchoContract(address)
-    );
-
-    await contract.sendDeploy(sender, toNano('0.05'));
-
-    console.log('✅ Contract deployed!');
-    console.log('🌐 Explorer link: https://testnet.tonviewer.com/' + address.toString());
+  // 3) Открываем провайдер + отправляем деплой
+  const sender = provider.sender();
+  const contract = provider.open(EchoContract.createFromAddress(address));
+  await contract.sendDeploy(sender, toNano('0.05'));
+  console.log('✅  Контракт задеплоен:', address.toString());
 }
